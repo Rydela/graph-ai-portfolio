@@ -1727,11 +1727,37 @@ there are other indicators that affect the rate.</p>
 </div>
 <div id="reflection-on-working-with-ai-written-by-ryan" class="section level2">
 <h2>Reflection on working with AI (written by Ryan)</h2>
+<p><strong>What was easy</strong></p>
+<ul>
+<li>What was easy was how good the agent was at installing prerequisites
+such as R. I also found using Claude Code inside VS Code very easy, even
+though the assignment requested Cursor or ChatGPT.</li>
+</ul>
+<p><strong>What was difficult</strong></p>
 <ul>
 <li>The most difficult part was choosing the correct indicators. While
 an agent could help with this, it highlights the continued need for
 domain knowledge expertise.</li>
+<li>Maps are inherently difficult because of things like mismatching
+codes and country names.</li>
+</ul>
+<p><strong>What was surprising</strong></p>
+<ul>
+<li>For certain countries, such as the occupied Palestinian territories,
+I expected the maps would not be made well on the first try, and they
+weren’t: Palestine and South Sudan were left off the first version
+because of a country code mismatch. What was surprising was that a
+built-in check caught it, so it could be fixed quickly.</li>
 <li>The agent used pretty standard color wheels for maps.</li>
+</ul>
+<p><strong>What I learned</strong></p>
+<ul>
+<li>I learned that validating the model, for example by checking that
+the data was for the year 2020, was very helpful to make sure that the
+model wasn’t hallucinating.</li>
+<li>This workflow is good for a basic exploratory analysis, but for
+something more professional or for work, more validation would be
+required, as well as using things like official admin boundaries.</li>
 </ul>
 <hr />
 <p><em>Report built in R Markdown with Claude Code (Anthropic) as the AI
