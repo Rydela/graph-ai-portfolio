@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* Set the theme before CSS applies to avoid a flash. Saved choice first, then OS preference. */
+(function () {
+  try {
+    var t = localStorage.getItem('contour-theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
+<title>Ryan Arias Delafosse | AI Course Portfolio</title>
+<meta name="description" content="Portfolio of work from the GRAPH Courses Generative AI for Work & Research cohort.">
+<meta name="author" content="Ryan Arias Delafosse">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+/* Styles adapted from the Contour Hugo theme by MobiusOne.org (MIT License).
+   https://github.com/mobiusone-org/hugo-contour */
+
+/* ---- Tokens ---- */
+:root {
+  --fg-src: #f5f3ee;
+  --bg-src: #1e6496;
+  --fg-src-rgb: 245, 243, 238;
+  --bg-src-rgb: 30, 100, 150;
+  --pad: clamp(20px, 3vw, 44px);
+  --sidebar-w: 31.4159vw;
+  --frame-pad: 36px;
+  --toggle-size: 34px;
+  --logo-left: clamp(36px, 2.8vw, 52px);
+  --post-max-w: 760px;
+  --post-pad-v: clamp(48px, 10vh, 120px);
+}
+:root,
+:root[data-theme="dark"] {
+  --fg: var(--fg-src);
+  --bg: var(--bg-src);
+  --fg-rgb: var(--fg-src-rgb);
+  --bg-rgb: var(--bg-src-rgb);
+}
+:root[data-theme="light"] {
+  --fg: var(--bg-src);
+  --bg: var(--fg-src);
+  --fg-rgb: var(--bg-src-rgb);
+  --bg-rgb: var(--fg-src-rgb);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
+}
+body { min-height: 100vh; }
+::selection { background: var(--fg); color: var(--bg); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* ---- Left panel (foreground colour) ---- */
+.site-panel {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  overflow: hidden;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ---- Contour canvas ---- */
+.contour-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* ---- Field frame: corner marks and map labels ---- */
+.field-frame {
+  position: absolute;
+  inset: 0;
+  color: var(--bg);
+  pointer-events: none;
+  --coords-max: calc(var(--sidebar-w) - var(--frame-pad) - var(--frame-pad) - 32px);
+}
+.mark { position: absolute; width: 16px; height: 16px; color: inherit; }
+.mark::before, .mark::after { content: ""; position: absolute; background: currentColor; }
+.mark::before { top: 50%; left: 0; width: 100%; height: 1px; }
+.mark::after { left: 50%; top: 0; height: 100%; width: 1px; }
+.mark.tl { top: var(--frame-pad); left: var(--frame-pad); transform: translate(-50%, -50%); }
+.mark.tr { top: var(--frame-pad); right: var(--frame-pad); transform: translate(50%, -50%); }
+.mark.bl { bottom: var(--frame-pad); left: var(--frame-pad); transform: translate(-50%, 50%); }
+.mark.br { bottom: var(--frame-pad); right: var(--frame-pad); transform: translate(50%, 50%); }
+
+.axis, .coords {
+  font-size: 11px;
+  font-weight: 300;
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--fg);
+}
+.axis::before, .axis::after,
+.coords::before, .coords::after {
+  content: "";
+  background: currentColor;
+  flex: 0 1 auto;
+  inline-size: 48px;
+  block-size: 1px;
+}
+.axis {
+  position: absolute;
+  top: 50%;
+  right: var(--frame-pad);
+  transform: translate(50%, -50%);
+  writing-mode: vertical-rl;
+  padding: 12px 0;
+  letter-spacing: 0.32em;
+  opacity: 0.7;
+}
+.coords {
+  position: absolute;
+  left: 50%;
+  bottom: var(--frame-pad);
+  transform: translate(-50%, 50%);
+  padding: 2px 12px;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  max-inline-size: var(--coords-max);
+}
+
+/* ---- Vertical name + kicker ---- */
+.logo-group {
+  position: absolute;
+  top: 50%;
+  left: var(--logo-left);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  z-index: 10;
+}
+.site-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: 700;
+  font-size: min(6.4vw, 7.2vh);
+  line-height: 0.75;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  color: var(--bg);
+  text-decoration: none;
+}
+.site-title .tld { font-weight: 300; opacity: 0.6; }
+.kicker {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid var(--fg);
+  background: var(--bg);
+  padding: 9px 6px;
+}
+.logo-kicker {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+  border-color: var(--bg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ---- Side menu (section anchors) ---- */
+.menu {
+  position: absolute;
+  top: 50%;
+  right: calc(var(--frame-pad) + 12px);
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 10;
+}
+.menu-list { display: flex; flex-direction: column; align-items: flex-end; }
+.menu-list a {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: 14px;
+  padding: clamp(6px, 1vh, 12px) 12px;
+  color: var(--bg);
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: clamp(18px, 2.8vh, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  transition: background .2s, color .2s;
+}
+.menu-list a + a { margin-top: -1px; }
+.menu-list a i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+}
+.menu-list a:hover,
+.menu-list a[aria-current="true"] { background: var(--bg); color: var(--fg); }
+.menu-list a:hover i, .menu-list a[aria-current="true"] i { opacity: 1; }
+
+/* ---- Theme toggle (top right) ---- */
+.site-controls {
+  position: fixed;
+  top: var(--frame-pad);
+  right: var(--frame-pad);
+  z-index: 30;
+}
+.theme-toggle {
+  width: var(--toggle-size);
+  height: var(--toggle-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-toggle:hover { background: var(--fg); color: var(--bg); }
+.theme-toggle:focus-visible { outline: 1px solid currentColor; outline-offset: 3px; }
+.theme-toggle svg { display: block; width: 16px; height: 16px; }
+
+/* ---- Content pane ---- */
+.content { margin-left: var(--sidebar-w); }
+.post {
+  max-width: var(--post-max-w);
+  margin: 0 auto;
+  padding: var(--post-pad-v) clamp(48px, 5vw, 72px);
+}
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.post-title {
+  margin-top: clamp(24px, 4vh, 40px);
+  font-size: clamp(30px, 4.2vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.post-lede {
+  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.8;
+  opacity: 0.85;
+}
+
+/* Avatar in a plate: L-shaped corner marks, same parts as the + marks */
+.intro {
+  display: flex;
+  align-items: center;
+  gap: clamp(24px, 4vw, 44px);
+  margin-top: clamp(40px, 7vh, 72px);
+}
+.plate-frame {
+  position: relative;
+  flex: none;
+  padding: 14px;
+  line-height: 0;
+  color: var(--fg);
+}
+.plate-frame .mark { width: 16px; height: 16px; border: 0 solid currentColor; transform: none; }
+.plate-frame .mark::before, .plate-frame .mark::after { content: none; }
+.plate-frame .mark.tl { top: 0; left: 0; border-width: 1px 0 0 1px; }
+.plate-frame .mark.tr { top: 0; right: 0; border-width: 1px 1px 0 0; }
+.plate-frame .mark.bl { bottom: 0; left: 0; border-width: 0 0 1px 1px; }
+.plate-frame .mark.br { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+.avatar {
+  display: block;
+  width: clamp(120px, 14vw, 168px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: grayscale(1) contrast(1.05);
+  transition: filter .4s;
+}
+.plate-frame:hover .avatar { filter: none; }
+.intro-facts { list-style: none; font-size: 13px; line-height: 1.7; }
+.intro-facts li + li { margin-top: 10px; }
+.intro-facts .label {
+  display: block;
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+/* ---- Body copy ---- */
+.post-body { margin-top: clamp(24px, 4vh, 40px); font-size: 15px; font-weight: 400; line-height: 1.95; }
+.post-body p { margin-bottom: 1.7em; }
+.post-body h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin: 3em 0 1.4em;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  scroll-margin-top: 24px;
+}
+.post-body h2 i {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+}
+.post-body h3 {
+  margin: 2.2em 0 0.6em;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.post-body a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  transition: background .2s, color .2s;
+}
+.post-body a:hover { background: var(--fg); color: var(--bg); text-decoration: none; }
+.post-body ul { margin: 0 0 1.7em 1.4em; }
+.post-body li { margin-bottom: 0.5em; }
+.post-body blockquote {
+  margin: 0 0 1.7em;
+  padding-left: 22px;
+  border-left: 2px solid var(--fg);
+  font-style: italic;
+  font-weight: 300;
+  opacity: 0.85;
+}
+.post-body hr {
+  border: 0;
+  border-top: 1px dashed rgba(var(--fg-rgb), 0.4);
+  margin: 3em 0;
+}
+
+/* ---- Ruled lists (experience, modules, submissions) ---- */
+.post-body .post-list { list-style: none; margin: 0 0 1.7em; padding: 0; }
+.post-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(var(--fg-rgb), 0.4);
+  line-height: 1.5;
+}
+.post-list li:first-child { border-top: 1px solid rgba(var(--fg-rgb), 0.4); }
+.post-list .item { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.post-list .item small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+.post-list .num {
+  margin-right: 14px;
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  opacity: 0.6;
+}
+.post-list .when {
+  flex: none;
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.post-list .pending .item { opacity: 0.5; }
+.post-body .post-list a { text-decoration: none; }
+.status {
+  flex: none;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+.pending .status { opacity: 0.5; border-style: dashed; }
+
+/* ---- Link chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.post-body .chips a {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid currentColor;
+  padding: 7px 10px;
+  line-height: 1.2;
+}
+
+/* ---- Colophon + copyright ---- */
+.colophon {
+  margin-top: 3em;
+  padding-top: 24px;
+  border-top: 1px solid rgba(var(--fg-rgb), 0.4);
+  font-size: 12px;
+  line-height: 1.8;
+  opacity: 0.85;
+}
+.colophon p + p { margin-top: 0.8em; }
+.copyright {
+  position: fixed;
+  right: calc(var(--frame-pad) + var(--toggle-size) / 2);
+  bottom: var(--pad);
+  transform: translateX(50%);
+  writing-mode: vertical-rl;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+
+/* ---- Narrow or portrait viewports: the panel becomes a top band ---- */
+@media (max-width: 960px), (max-aspect-ratio: 1/1) {
+  :root { --band-h: 304px; }
+  .site-panel {
+    position: relative;
+    width: 100%;
+    height: var(--band-h);
+    container-type: size;
+  }
+  .field-frame { --coords-max: calc(100cqh - var(--frame-pad) - var(--frame-pad) - 32px); }
+  .content { margin-left: 0; }
+  .site-controls {
+    position: absolute;
+    top: calc(var(--band-h) + var(--post-pad-v));
+    right: max(24px, (100% - var(--post-max-w)) / 2 + 24px);
+  }
+  .post { padding-left: 24px; padding-right: 24px; }
+  .post-meta { padding-right: calc(var(--toggle-size) + 16px); }
+  .copyright {
+    display: block;
+    position: static;
+    width: max-content;
+    margin: 0 24px 24px auto;
+    transform: none;
+  }
+  .logo-group {
+    left: calc(var(--frame-pad) + 16px);
+    gap: 12px;
+  }
+  .site-title { font-size: 6.2cqh; line-height: 0.6; }
+  .logo-kicker {
+    font-size: clamp(8px, 2.65cqh, 10px);
+    letter-spacing: 0.06em;
+    padding: min(2cqh, 4px) 3px;
+    line-height: 1.3;
+  }
+  .axis {
+    top: auto;
+    right: auto;
+    left: 50%;
+    bottom: var(--frame-pad);
+    transform: translate(-50%, 50%);
+    writing-mode: horizontal-tb;
+    padding: 2px 8px;
+    font-size: 8px;
+  }
+  .coords {
+    left: auto;
+    bottom: auto;
+    right: var(--frame-pad);
+    top: 50%;
+    transform: translate(50%, -50%);
+    writing-mode: vertical-rl;
+    padding: 8px 2px;
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+  .menu { right: 54px; }
+  .menu-list a { align-items: center; padding: 8px 12px; font-size: 16px; }
+}
+@media (max-width: 560px) {
+  .intro { flex-direction: column; align-items: flex-start; }
+  .post-list li { flex-wrap: wrap; row-gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<aside class="site-panel">
+  <canvas class="contour-canvas" data-contour aria-hidden="true"></canvas>
+  <div class="field-frame">
+    <span class="mark tl" aria-hidden="true"></span>
+    <span class="mark tr" aria-hidden="true"></span>
+    <span class="mark bl" aria-hidden="true"></span>
+    <span class="mark br" aria-hidden="true"></span>
+    <span class="axis">Elevation / Isoline Field · N=54</span>
+    <span class="coords" data-contour-coords>46.2044° N · 6.1432° E</span>
+  </div>
+  <div class="logo-group">
+    <a class="site-title" href="#top">Ryan<span class="tld"> Arias Delafosse</span></a>
+    <span class="kicker logo-kicker">Geospatial Data Scientist · UNIGE PhD</span>
+  </div>
+  <nav class="menu" aria-label="Sections">
+    <div class="menu-list">
+      <a href="#about"><i>01</i>About/</a>
+      <a href="#course"><i>02</i>Course/</a>
+      <a href="#work"><i>03</i>Work/</a>
+    </div>
+  </nav>
+</aside>
+
+<div class="site-controls">
+  <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle light / dark theme" title="Toggle light / dark theme">
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.2"/>
+      <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="currentColor"/>
+    </svg>
+  </button>
+</div>
+
+<main class="content" id="top">
+  <article class="post">
+    <header>
+      <div class="post-meta">
+        <span class="kicker">Portfolio/</span>
+        <span>The GRAPH Courses</span>
+        <span>8 weeks</span>
+      </div>
+      <h1 class="post-title">Generative AI for Work &amp; Research</h1>
+      <p class="post-lede">A running record of what I build in this course, one submission per week.</p>
+
+      <div class="intro">
+        <div class="plate-frame">
+          <span class="mark tl" aria-hidden="true"></span>
+          <span class="mark tr" aria-hidden="true"></span>
+          <span class="mark bl" aria-hidden="true"></span>
+          <span class="mark br" aria-hidden="true"></span>
+          <img class="avatar" src="headshot.png" alt="Portrait of Ryan Arias Delafosse" width="168" height="168">
+        </div>
+        <ul class="intro-facts">
+          <li><span class="label">Name</span>Ryan Arias Delafosse</li>
+          <li><span class="label">Role</span>Senior Data Scientist, World Bank</li>
+          <li><span class="label">Research</span>PhD candidate, Institute of Global Health, University of Geneva</li>
+        </ul>
+      </div>
+    </header>
+
+    <div class="post-body">
+      <h2 id="about"><i>01</i>About me</h2>
+      <p>Data scientist with over 10 years of experience building decision-support data systems across the World Bank, UN agencies, and government partners. I lead data work end to end, from field data collection and pipeline engineering to analytics and executive-ready products used by senior decision-makers, mostly in humanitarian, development, and fragile contexts.</p>
+      <p>My PhD at the University of Geneva (Biomedical Sciences, Global Health track) looks at how open geospatial data can be used to model climate-induced migration and its consequences for public health.</p>
+
+      <h3>Experience</h3>
+      <ul class="post-list">
+        <li><span class="item">World Bank<small>Senior Data Scientist; previously Data Scientist</small></span><span class="when">2025 to now</span></li>
+        <li><span class="item">World Health Organization<small>Geospatial Data Scientist</small></span><span class="when">2023 to 2025</span></li>
+        <li><span class="item">UNHCR<small>Global Information Management Officer</small></span><span class="when">2021 to 2023</span></li>
+        <li><span class="item">UN OCHA<small>Information Management Officer</small></span><span class="when">2020 to 2021</span></li>
+        <li><span class="item">Virgin Islands Recovery and Development Agency<small>Interim Head of Monitoring and Evaluation</small></span><span class="when">2018 to 2020</span></li>
+        <li><span class="item">ACLED, IOM, IFRC, IDMC, REACH<small>Research, GIS, and data roles across the Middle East</small></span><span class="when">2014 to 2018</span></li>
+      </ul>
+
+      <h3>Education</h3>
+      <ul class="post-list">
+        <li><span class="item">University of Geneva<small>PhD, Biomedical Sciences, Global Health track</small></span><span class="when">2024 to now</span></li>
+        <li><span class="item">ESILV Paris<small>MEng, Computer Engineering: Machine Learning &amp; AI</small></span><span class="when">2019 to 2021</span></li>
+        <li><span class="item">King's College London<small>MA, War Studies: Conflict, Security, and Development</small></span><span class="when">2015 to 2016</span></li>
+        <li><span class="item">Texas A&amp;M University<small>BA, International Studies: Middle East Studies</small></span><span class="when">2007 to 2011</span></li>
+      </ul>
+
+      <h3>Selected publication</h3>
+      <ul class="post-list">
+        <li><span class="item"><a href="https://doi.org/10.1186/s13031-026-00772-7">Hospital Functionality in the Gaza Strip</a><small>Conflict and Health (co-author)</small></span><span class="when">2026</span></li>
+      </ul>
+
+      <div class="chips">
+        <a href="https://github.com/Rydela">GitHub</a>
+        <a href="https://www.linkedin.com/in/rydelafosse/">LinkedIn</a>
+        <a href="https://rydela.github.io">Main portfolio</a>
+      </div>
+
+      <h2 id="course"><i>02</i>About the course</h2>
+      <p><a href="https://thegraphcourses.org/aiw">Generative AI for Work &amp; Research</a> is an 8-week live cohort course from The GRAPH Courses, based at the University of Geneva. It covers no-code AI tools for responsible task automation, through weekly prework, live workshops, and hands-on practice.</p>
+      <ul class="post-list">
+        <li><span class="item"><span class="num">M1</span>Websites, documents &amp; presentations</span></li>
+        <li><span class="item"><span class="num">M2</span>AI-automated data analysis</span></li>
+        <li><span class="item"><span class="num">M3</span>GenAI for text processing &amp; research</span></li>
+        <li><span class="item"><span class="num">M4</span>Custom GPTs and chatbots</span></li>
+        <li><span class="item"><span class="num">M5</span>AI for task automation</span></li>
+        <li><span class="item"><span class="num">M6</span>GenAI for communication &amp; outreach</span></li>
+        <li><span class="item"><span class="num">M7</span>Capstone project &amp; showcase</span></li>
+      </ul>
+
+      <h2 id="work"><i>03</i>Weekly submissions</h2>
+      <ul class="post-list">
+        <li><span class="item"><span class="num">W01</span><a href="#top">Portfolio website</a><small>This page, built with Claude Code and hosted on GitHub Pages</small></span><span class="status">Live</span></li>
+        <li class="pending"><span class="item"><span class="num">W02</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W03</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W04</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W05</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W06</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W07</span>To be added</span><span class="status">Soon</span></li>
+        <li class="pending"><span class="item"><span class="num">W08</span>To be added</span><span class="status">Soon</span></li>
+      </ul>
+
+      <footer class="colophon">
+        <p>Built with Claude Code in VS Code as a single HTML file, with no frameworks, and hosted on GitHub Pages.</p>
+        <p>Design adapted from <a href="https://github.com/mobiusone-org/hugo-contour">Contour</a>, a Hugo theme by <a href="https://mobiusone.org">MobiusOne.org</a>, MIT License. Click the contour map to generate new terrain.</p>
+      </footer>
+    </div>
+  </article>
+</main>
+
+<span class="copyright">© 2026 R. Arias Delafosse</span>
+
+<script>
+/* Contour field: seeded value noise drawn as isolines with marching squares.
+   Adapted from contour.js in the Contour Hugo theme (MobiusOne.org, MIT License). */
+(function () {
+  'use strict';
+  var fade = function (t) { return t * t * t * (t * (t * 6 - 15) + 10); };
+  var lerp = function (a, b, t) { return a + (b - a) * t; };
+  var cross = function (a, b, t) { return (t - a) / (b - a); };
+  var cssRGB = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
+
+  function formatCoords(lat, lon) {
+    return Math.abs(lat).toFixed(4) + '° ' + (lat >= 0 ? 'N' : 'S') + ' · ' +
+           Math.abs(lon).toFixed(4) + '° ' + (lon >= 0 ? 'E' : 'W');
+  }
+
+  function create(canvas, opts) {
+    var CELL = opts.cell, SCALE = 0.0021, LEVELS = 54;
+    var ctx = canvas.getContext('2d');
+    var perm, cols, rows, field, dpr, width, height;
+    var z = Math.random() * 100;
+    var waterFrac = 0.4 + Math.random() * 0.2;
+
+    function reseed() {
+      perm = new Uint8Array(512);
+      var p = new Uint8Array(256), i, j, tmp;
+      for (i = 0; i < 256; i++) p[i] = i;
+      for (i = 255; i > 0; i--) { j = (Math.random() * (i + 1)) | 0; tmp = p[i]; p[i] = p[j]; p[j] = tmp; }
+      for (i = 0; i < 512; i++) perm[i] = p[i & 255];
+    }
+    function rnd(x, y, zz) { return perm[(perm[(perm[x & 255] + y) & 255] + zz) & 255] / 255; }
+    function noise3(x, y, zz) {
+      var xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(zz);
+      var u = fade(x - xi), v = fade(y - yi), w = fade(zz - zi);
+      return lerp(
+        lerp(lerp(rnd(xi, yi, zi), rnd(xi + 1, yi, zi), u),
+             lerp(rnd(xi, yi + 1, zi), rnd(xi + 1, yi + 1, zi), u), v),
+        lerp(lerp(rnd(xi, yi, zi + 1), rnd(xi + 1, yi, zi + 1), u),
+             lerp(rnd(xi, yi + 1, zi + 1), rnd(xi + 1, yi + 1, zi + 1), u), v), w);
+    }
+    function fbm(x, y, zz) {
+      var sum = 0, amp = 1, freq = 1, norm = 0;
+      for (var o = 0; o < 4; o++) { sum += noise3(x * freq, y * freq, zz * freq) * amp; norm += amp; amp *= 0.5; freq *= 2; }
+      return sum / norm;
+    }
+    function elevation(x, y, zz) {
+      var wx = fbm(x * 0.4 + 13.7, y * 0.4 + 71.3, zz);
+      var wy = fbm(x * 0.4 + 91.2, y * 0.4 + 5.5, zz);
+      var macro = fbm(x * 0.22 + (wx - 0.5) * 1.6, y * 0.22 + (wy - 0.5) * 1.6, zz + 37);
+      var h = macro * 0.7 + fbm(x, y, zz) * 0.3;
+      h = 0.5 + (h - 0.5) * 1.9;
+      return h < 0 ? 0 : h > 1 ? 1 : h;
+    }
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = canvas.clientWidth; height = canvas.clientHeight;
+      canvas.width = width * dpr; canvas.height = height * dpr;
+      cols = Math.ceil(width / CELL) + 1; rows = Math.ceil(height / CELL) + 1;
+      field = new Float32Array(cols * rows);
+    }
+    function sampleField() {
+      for (var j = 0; j < rows; j++)
+        for (var i = 0; i < cols; i++)
+          field[j * cols + i] = elevation(i * CELL * SCALE, j * CELL * SCALE, z);
+    }
+    function drawLevel(t) {
+      ctx.beginPath();
+      function seg(a, b) { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
+      for (var j = 0; j < rows - 1; j++) {
+        var y0 = j * CELL, y1 = y0 + CELL;
+        for (var i = 0; i < cols - 1; i++) {
+          var x0 = i * CELL, x1 = x0 + CELL;
+          var tl = field[j * cols + i], tr = field[j * cols + i + 1];
+          var br = field[(j + 1) * cols + i + 1], bl = field[(j + 1) * cols + i];
+          var c = (tl > t ? 8 : 0) | (tr > t ? 4 : 0) | (br > t ? 2 : 0) | (bl > t ? 1 : 0);
+          if (c === 0 || c === 15) continue;
+          var top = [x0 + CELL * cross(tl, tr, t), y0];
+          var right = [x1, y0 + CELL * cross(tr, br, t)];
+          var bottom = [x0 + CELL * cross(bl, br, t), y1];
+          var left = [x0, y0 + CELL * cross(tl, bl, t)];
+          switch (c) {
+            case 1: case 14: seg(left, bottom); break;
+            case 2: case 13: seg(bottom, right); break;
+            case 3: case 12: seg(left, right); break;
+            case 4: case 11: seg(top, right); break;
+            case 6: case 9: seg(top, bottom); break;
+            case 7: case 8: seg(left, top); break;
+            case 5: seg(left, top); seg(bottom, right); break;
+            case 10: seg(left, bottom); seg(top, right); break;
+          }
+        }
+      }
+      ctx.stroke();
+    }
+    function seaLevel() {
+      var sorted = Float32Array.from(field).sort();
+      return sorted[Math.min(sorted.length - 1, (sorted.length * waterFrac) | 0)];
+    }
+    function render() {
+      var color = cssRGB(opts.color);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      sampleField();
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      var SEA = seaLevel();
+      ctx.setLineDash([3, 7]);
+      ctx.strokeStyle = 'rgba(' + color + ', 0.16)';
+      ctx.lineWidth = 1;
+      for (var d = 1; d <= 3; d++) drawLevel(SEA - d * 0.05);
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(' + color + ', 0.9)';
+      ctx.lineWidth = 1.8;
+      drawLevel(SEA);
+      for (var l = 1; l <= LEVELS; l++) {
+        var t = l / (LEVELS + 1);
+        if (t <= SEA) continue;
+        var index = l % 5 === 0;
+        ctx.strokeStyle = 'rgba(' + color + ', ' + (index ? 0.7 : 0.45) + ')';
+        ctx.lineWidth = index ? 1.5 : 1.1;
+        drawLevel(t);
+      }
+    }
+    function regenerate() {
+      reseed();
+      z = Math.random() * 100;
+      waterFrac = 0.4 + Math.random() * 0.2;
+      if (opts.onRegenerate) opts.onRegenerate({ lat: Math.random() * 180 - 90, lon: Math.random() * 360 - 180 });
+      render();
+    }
+    canvas.addEventListener('click', regenerate);
+    var lastW = 0, lastH = 0;
+    window.addEventListener('resize', function () {
+      if (canvas.clientWidth === lastW && canvas.clientHeight === lastH) return;
+      lastW = canvas.clientWidth; lastH = canvas.clientHeight;
+      resize(); render();
+    });
+    reseed(); resize(); lastW = width; lastH = height; render();
+    return { render: render };
+  }
+
+  var canvas = document.querySelector('canvas[data-contour]');
+  var coords = document.querySelector('[data-contour-coords]');
+  var instance = create(canvas, {
+    color: '--bg-rgb',
+    cell: 10,
+    onRegenerate: function (p) { coords.textContent = formatCoords(p.lat, p.lon); }
+  });
+
+  /* Light / dark toggle: swaps the two theme colours and redraws the map. */
+  var root = document.documentElement;
+  var toggle = document.querySelector('[data-theme-toggle]');
+  var current = function () { return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; };
+  toggle.setAttribute('aria-pressed', String(current() === 'light'));
+  toggle.addEventListener('click', function () {
+    var next = current() === 'light' ? 'dark' : 'light';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('contour-theme', next); } catch (e) {}
+    toggle.setAttribute('aria-pressed', String(next === 'light'));
+    instance.render();
+  });
+
+  /* Highlight the side-menu entry for the section in view. */
+  var links = document.querySelectorAll('.menu-list a');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.setAttribute('aria-current', String(a.getAttribute('href') === '#' + e.target.id)); });
+      });
+    }, { rootMargin: '0px 0px -60% 0px' });
+    ['about', 'course', 'work'].forEach(function (id) { io.observe(document.getElementById(id)); });
+  }
+})();
+</script>
+</body>
+</html>
