@@ -1,0 +1,229 @@
+---
+title: "Poverty and Child Mortality in 2020"
+subtitle: "Workshop 2: Automated Data Analysis & Reporting, Generative AI for Work & Research (The GRAPH Courses)"
+author: "Ryan Arias Delafosse"
+date: "October 2026"
+output:
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.width = 10, fig.height = 5.6, dpi = 150)
+suppressPackageStartupMessages({
+  library(readr); library(dplyr); library(tidyr); library(ggplot2)
+  library(sf); library(rnaturalearth); library(ggrepel); library(scales)
+})
+sf_use_s2(FALSE)
+
+year <- "2020"
+focus <- c(zaf = "South Africa", can = "Canada", vnm = "Vietnam")
+
+read_gapminder <- function(path, value_name) {
+  read_csv(path, show_col_types = FALSE, col_types = cols(.default = col_character())) |>
+    select(geo, name, value = all_of(year)) |>
+    mutate(value = parse_number(value)) |>
+    rename(!!value_name := value)
+}
+
+cm  <- read_gapminder("data/child_mortality_0_5_year_olds_dying_per_1000_born.csv", "child_mortality")
+pov <- read_gapminder("data/poverty_rate_under_6_85_usd_per_day.csv", "poverty_rate")
+
+joined <- full_join(cm, pov |> select(-name), by = "geo")
+both   <- joined |> filter(!is.na(child_mortality), !is.na(poverty_rate))
+
+# World polygons, joined on ISO3 code (Gapminder geo codes are lower-case ISO3)
+world <- ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(admin != "Antarctica") |>
+  mutate(geo = tolower(adm0_a3),
+         # Natural Earth uses non-ISO codes for these two
+         geo = recode(geo, psx = "pse", sds = "ssd")) |>
+  select(geo, geometry)
+unmatched <- setdiff(joined$geo, world$geo)
+map_data  <- world |> left_join(joined, by = "geo")
+
+robinson <- "+proj=robin"
+label_pts <- map_data |>
+  filter(geo %in% names(focus)) |>
+  st_transform(robinson) |>
+  st_point_on_surface()
+label_xy <- bind_cols(st_drop_geometry(label_pts), as_tibble(st_coordinates(label_pts)))
+
+theme_report <- theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"),
+        plot.caption = element_text(colour = "grey40", size = 9),
+        legend.position = "bottom", legend.key.width = unit(2.2, "cm"))
+
+focus_rows <- both |> filter(geo %in% names(focus)) |> arrange(desc(poverty_rate))
+pearson  <- cor.test(both$poverty_rate, both$child_mortality, method = "pearson")
+spearman <- cor.test(both$poverty_rate, both$child_mortality, method = "spearman", exact = FALSE)
+
+# Median child mortality by poverty band, used in the interpretation text
+bands <- both |>
+  mutate(band = cut(poverty_rate, c(-Inf, 2, 10, 25, 50, 75, 100),
+                    labels = c("2% or less", "2-10%", "10-25%", "25-50%", "50-75%", "over 75%"))) |>
+  group_by(band) |>
+  summarise(n = n(), median_cm = median(child_mortality),
+            min_cm = min(child_mortality), max_cm = max(child_mortality),
+            min_name = name[which.min(child_mortality)], max_name = name[which.max(child_mortality)])
+band_med <- function(b) number(bands$median_cm[bands$band == b], accuracy = 0.1)
+sa <- focus_rows |> filter(geo == "zaf")
+sa_band <- bands |> filter(band == "50-75%")
+f1 <- function(x) number(x, accuracy = 0.1)
+f2 <- function(x) number(x, accuracy = 0.01)
+```
+
+## Data
+
+This report uses two indicators from [Gapminder](https://www.gapminder.org/data/), both for the year **2020**:
+
+- **Child mortality**: deaths of children under age 5 per 1,000 live births. Available for `r sum(!is.na(cm$child_mortality))` countries.
+- **Poverty rate**: share of the population living on less than \$6.85 a day (2017 PPP), from Gapminder's poverty estimates. Available for `r sum(!is.na(pov$poverty_rate))` countries.
+
+`r nrow(both)` countries have values for both indicators and are used in the scatterplot and correlations. I first considered the *number* of people in poverty, but a headcount mostly reflects population size (large countries dominate), so the poverty *rate* is a fairer comparison with a per-birth mortality rate.
+
+Three countries are highlighted throughout: South Africa, Vietnam, and Canada.
+
+```{r focus-table}
+focus_rows |>
+  transmute(Country = name,
+            `Poverty rate, % below $6.85/day` = number(poverty_rate, accuracy = 0.01),
+            `Child mortality, per 1,000 births` = number(child_mortality, accuracy = 0.01)) |>
+  knitr::kable(align = "lrr")
+```
+
+## Map 1: Child mortality, 2020
+
+```{r map-child-mortality}
+lab_cm <- label_xy |> mutate(label = paste0(focus[geo], "\n", number(child_mortality, accuracy = 0.01), " per 1,000"))
+
+ggplot(map_data) +
+  geom_sf(aes(fill = child_mortality), colour = "white", linewidth = 0.1) +
+  geom_point(data = lab_cm, aes(X, Y), size = 1.8) +
+  geom_label_repel(data = lab_cm, aes(X, Y, label = label), size = 3.2,
+                   min.segment.length = 0, box.padding = 0.6, seed = 1, label.size = 0.2) +
+  scale_fill_viridis_c(option = "magma", direction = -1, trans = "log10",
+                       breaks = c(2, 5, 10, 20, 50, 100), na.value = "grey85",
+                       name = "Deaths under 5 per 1,000 live births (log scale)") +
+  coord_sf(crs = robinson, datum = NA) +
+  labs(title = "Child mortality, 2020",
+       caption = "Source: Gapminder, child mortality (0-5 year olds dying per 1,000 born). Grey: no data.",
+       x = NULL, y = NULL) +
+  theme_report
+```
+
+## Map 2: Poverty rate, 2020
+
+```{r map-poverty}
+lab_pov <- label_xy |> mutate(label = paste0(focus[geo], "\n", number(poverty_rate, accuracy = 0.01), "%"))
+
+ggplot(map_data) +
+  geom_sf(aes(fill = poverty_rate), colour = "white", linewidth = 0.1) +
+  geom_point(data = lab_pov, aes(X, Y), size = 1.8) +
+  geom_label_repel(data = lab_pov, aes(X, Y, label = label), size = 3.2,
+                   min.segment.length = 0, box.padding = 0.6, seed = 1, label.size = 0.2) +
+  scale_fill_viridis_c(option = "viridis", direction = -1, limits = c(0, 100),
+                       na.value = "grey85",
+                       name = "% of population living on less than $6.85 a day") +
+  coord_sf(crs = robinson, datum = NA) +
+  labs(title = "Poverty rate, 2020",
+       caption = "Source: Gapminder, poverty rate below $6.85/day (gm_685pov_rate). Grey: no data.",
+       x = NULL, y = NULL) +
+  theme_report
+```
+
+## Relationship between the two indicators
+
+```{r scatter, fig.height = 6}
+lab_sc <- focus_rows |>
+  mutate(label = paste0(name, "\n", number(poverty_rate, accuracy = 0.01), "% poverty, ",
+                        number(child_mortality, accuracy = 0.01), " per 1,000"))
+
+ggplot(both, aes(poverty_rate, child_mortality)) +
+  geom_smooth(method = "loess", formula = y ~ x, colour = "grey30", fill = "grey80", linewidth = 0.6) +
+  geom_point(colour = "#1e6496", alpha = 0.55, size = 2) +
+  geom_point(data = lab_sc, colour = "#c0392b", size = 3) +
+  geom_label_repel(data = lab_sc, aes(label = label), size = 3.2, seed = 2,
+                   min.segment.length = 0, box.padding = 0.8, label.size = 0.2) +
+  scale_y_log10(breaks = c(2, 5, 10, 20, 50, 100)) +
+  scale_x_continuous(labels = label_percent(scale = 1), limits = c(0, 100)) +
+  labs(title = "Countries with higher poverty rates have higher child mortality",
+       subtitle = paste0("2020, ", nrow(both), " countries. Line: LOESS smoother with 95% band."),
+       x = "Poverty rate (% living on less than $6.85 a day)",
+       y = "Child mortality per 1,000 births (log scale)",
+       caption = "Source: Gapminder.") +
+  theme_report
+```
+
+Across the `r nrow(both)` countries, poverty rate and child mortality move together strongly. The rank correlation is Spearman's ρ = `r number(spearman$estimate, accuracy = 0.01)` and the linear correlation is Pearson's r = `r number(pearson$estimate, accuracy = 0.01)` (both p `r ifelse(pearson$p.value < 0.001, "< 0.001", paste("=", signif(pearson$p.value, 2)))`). Spearman is the better summary here because both indicators are skewed: most countries cluster at low poverty and low mortality, with a long tail of countries that are high on both.
+
+Grouping countries by poverty rate shows the gradient clearly. Median child mortality is `r band_med("2% or less")` per 1,000 where 2% or less of people live below \$6.85 a day, `r band_med("10-25%")` at 10-25% poverty, `r band_med("50-75%")` at 50-75%, and `r band_med("over 75%")` where more than three quarters of people are poor. The spread within each group is wide, though: among countries with 50-75% poverty, child mortality ranges from `r f1(sa_band$min_cm)` (`r sa_band$min_name`) to `r f1(sa_band$max_cm)` (`r sa_band$max_name`).
+
+The three highlighted countries follow the overall pattern. Canada sits in the low-poverty, low-mortality corner, Vietnam is in the middle, and South Africa has both the highest poverty rate (`r f2(sa$poverty_rate)`%) and the highest child mortality (`r f2(sa$child_mortality)`) of the three. South Africa is close to typical for its poverty level: its child mortality is almost exactly the median of the 50-75% group (`r band_med("50-75%")`). Vietnam's mortality (`r f2(focus_rows$child_mortality[focus_rows$geo == "vnm"])`) is above the median for its 10-25% poverty group (`r band_med("10-25%")`).
+
+This is a cross-country association for a single year, not evidence that poverty causes child mortality. Both are linked to shared factors such as health system capacity, sanitation, education, and conflict, and country averages hide large differences within countries.
+
+```{r verification, include = FALSE}
+# Independent check: re-read the raw CSVs with base R and compare to the values used in plots
+raw_val <- function(path, g) {
+  d <- read.csv(path, check.names = FALSE, fileEncoding = "UTF-8-BOM")
+  as.numeric(d[d$geo == g, year])
+}
+for (g in names(focus)) {
+  stopifnot(
+    all.equal(raw_val("data/child_mortality_0_5_year_olds_dying_per_1000_born.csv", g),
+              both$child_mortality[both$geo == g]),
+    all.equal(raw_val("data/poverty_rate_under_6_85_usd_per_day.csv", g),
+              both$poverty_rate[both$geo == g])
+  )
+}
+```
+
+The labelled values on both maps and the scatterplot were checked automatically against the raw 2020 columns of the two CSV files when this report was built. `r if (length(unmatched)) paste0("Countries in the data without a map polygon: ", paste(unmatched, collapse = ", "), ".") else "Every country in the data matched a map polygon."`
+
+## Beyond poverty: countries off the curve (AI analysis)
+
+```{r residuals}
+fit <- loess(log10(child_mortality) ~ poverty_rate, data = both)
+off <- both |>
+  mutate(expected = 10^fitted(fit), ratio = child_mortality / expected)
+r2 <- 1 - var(residuals(fit)) / var(log10(both$child_mortality))
+ratio_of <- function(g) number(off$ratio[off$geo == g], accuracy = 0.01)
+
+off_table <- bind_rows(
+  off |> slice_max(ratio, n = 5) |> mutate(Direction = "Higher than expected"),
+  off |> slice_min(ratio, n = 5) |> mutate(Direction = "Lower than expected")
+) |>
+  transmute(Direction, Country = name,
+            `Poverty rate, %` = number(poverty_rate, accuracy = 0.1),
+            `Child mortality` = number(child_mortality, accuracy = 0.1),
+            `Expected from poverty` = number(expected, accuracy = 0.1),
+            `Actual / expected` = number(ratio, accuracy = 0.01))
+```
+
+To put a number on how much the spread matters, I fitted the same LOESS curve shown in the scatterplot (on the log scale) and compared each country's actual child mortality with the value "expected" for its poverty rate. Poverty rate accounts for about `r percent(r2, accuracy = 1)` of the variation in log child mortality across countries, so roughly `r percent(1 - r2, accuracy = 1)` is left to other factors. The countries furthest from the curve are:
+
+```{r residual-table}
+knitr::kable(off_table, align = "llrrrr")
+```
+
+Two patterns stand out. Below the curve are countries such as Cuba and Sri Lanka, which combine high poverty rates at the \$6.85 line with child mortality close to that of much richer countries; both are often cited for strong public primary health care. Above the curve are mostly countries with low poverty but higher child mortality than their peers, led by Equatorial Guinea, where oil-driven income has not translated into child survival, and several small or resource-rich states. Some of these comparisons rest on modelled estimates rather than household surveys (North Korea and Cuba in particular), so individual cases should be read with care.
+
+For the highlighted countries, South Africa is almost exactly on the curve (actual / expected = `r ratio_of("zaf")`), Canada is slightly above it (`r ratio_of("can")`), and Vietnam is noticeably above it (`r ratio_of("vnm")`): its child mortality is about `r percent(off$ratio[off$geo == "vnm"] - 1, accuracy = 1)` higher than the curve predicts for its poverty rate.
+
+## Summary of findings (written by Ryan)
+
+There was a wider spread of child mortality than expected, implying there are other indicators that affect the rate.
+
+## Reflection on working with AI (written by Ryan)
+
+- The most difficult part was choosing the correct indicators. While an agent could help with this, it highlights the continued need for domain knowledge expertise.
+- The agent used pretty standard color wheels for maps.
+
+---
+
+*Report built in R Markdown with Claude Code (Anthropic) as the AI agent, in place of Cursor. Code is hidden; the source is `week02_report.Rmd` in this folder.*
